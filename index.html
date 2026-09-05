@@ -803,24 +803,13 @@
         </div>
         <table class="items-table">
           <thead><tr>
-            <th style="width:44%;">Description of Work / Item</th>
-            <th style="width:10%;">Qty</th>
-            <th style="width:10%;">Unit</th>
-            <th style="width:31%;">Remarks</th>
+            <th style="width:60%;">Description of Work / Item</th>
+            <th style="width:15%;">Qty</th>
+            <th style="width:15%;">Unit</th>
             <th style="width:5%;"></th>
           </tr></thead>
           <tbody id="cert-items"></tbody>
         </table>
-      </div>
-
-      <!-- Additional Remarks -->
-      <div class="inv-card">
-        <div class="inv-card-header"><span class="inv-card-title">Additional Remarks / Terms</span></div>
-        <div class="inv-card-body">
-          <div class="form-group">
-            <textarea id="cert-remarks" rows="2" placeholder="e.g. Warranty: 1 year on parts and labour. For service, contact us at the above number.…" oninput="certState.remarks=this.value;"></textarea>
-          </div>
-        </div>
       </div>
 
     </div><!-- /inv-page-body -->
@@ -5197,7 +5186,7 @@ function loadDashboardAMC(){
 let certState = {
   certNo:'', certType:'Refilling',
   issueDate:new Date().toISOString().split('T')[0],
-  validUntil:'', refNo:'', site:'', remarks:'',
+  validUntil:'', refNo:'', site:'',
   recipient:{name:'',address:'',phone:'',email:'',gstin:''},
   items:[],
   isSaved:false, buyerSearchTimeout:null,
@@ -5214,7 +5203,7 @@ function openNewCertificatePage(){
   certState={
     certNo:'', certType:'Refilling',
     issueDate:new Date().toISOString().split('T')[0],
-    validUntil:'', refNo:'', site:'', remarks:'',
+    validUntil:'', refNo:'', site:'',
     recipient:{name:'',address:'',phone:'',email:'',gstin:''},
     items:[],
     isSaved:false, buyerSearchTimeout:null,
@@ -5224,7 +5213,7 @@ function openNewCertificatePage(){
   const tl=document.getElementById('cert-page-title');if(tl)tl.textContent='New Certificate';
   const lbl=document.getElementById('cert-save-btn-label');if(lbl)lbl.textContent='Save Certificate';
 
-  ['cert-no','cert-ref-no','cert-site','cert-recipient-name','cert-recipient-address','cert-recipient-phone','cert-recipient-email','cert-recipient-gstin','cert-remarks'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['cert-no','cert-ref-no','cert-site','cert-recipient-name','cert-recipient-address','cert-recipient-phone','cert-recipient-email','cert-recipient-gstin'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('cert-issue-date').value=certState.issueDate;
   document.getElementById('cert-valid-until').value='';
   document.getElementById('cert-type').value='Refilling';
@@ -5282,7 +5271,7 @@ async function fetchNextCertNo(){
 // ── CERTIFICATE LINE ITEMS ────────────────────────────────────────────────────
 function addCertItem(){
   const id=Date.now()*1000+(++__gmeItemIdSeq%1000);
-  certState.items.push({id,desc:'',qty:1,unit:'Nos',remarks:''});
+  certState.items.push({id,desc:'',qty:1,unit:'Nos'});
   certState.isSaved=false;
   const tr=document.createElement('tr');
   tr.id='cti-'+id;
@@ -5290,7 +5279,6 @@ function addCertItem(){
     <td><input type="text" value="" placeholder="Describe the work / item…" style="width:100%;" oninput="updateCertItem(${id},'desc',this.value)"/></td>
     <td><input type="number" value="1" min="0" style="width:100%;" oninput="updateCertItem(${id},'qty',this.value)"/></td>
     <td><select style="width:100%;" onchange="updateCertItem(${id},'unit',this.value)"><option>Nos</option><option>Hrs</option><option>Pcs</option><option>Kg</option><option>Ltr</option><option>Box</option><option>Mtr</option><option>Set</option></select></td>
-    <td><input type="text" value="" placeholder="Remarks…" style="width:100%;" oninput="updateCertItem(${id},'remarks',this.value)"/></td>
     <td><button class="remove-row" onclick="removeCertItem(${id})">✕</button></td>`;
   document.getElementById('cert-items').appendChild(tr);
 }
@@ -5389,7 +5377,7 @@ async function handleSaveCertificate(){
   if(btn)btn.disabled=true; if(lbl)lbl.textContent='Saving…';
 
   const cleanItems=certState.items.filter(i=>(i.desc||'').trim()).map(item=>({
-    desc:item.desc||'', qty:parseFloat(item.qty)||0, unit:item.unit||'Nos', remarks:item.remarks||''
+    desc:item.desc||'', qty:parseFloat(item.qty)||0, unit:item.unit||'Nos'
   }));
 
   const payload={
@@ -5403,7 +5391,6 @@ async function handleSaveCertificate(){
     refNo:document.getElementById('cert-ref-no').value.trim()||'',
     site:document.getElementById('cert-site').value.trim()||'',
     itemsJson:JSON.stringify(cleanItems),
-    remarks:document.getElementById('cert-remarks').value.trim()||'',
     recipientName:certState.recipient.name,
     recipientAddress:certState.recipient.address||'',
     recipientPhone:certState.recipient.phone||'',
@@ -5441,7 +5428,7 @@ async function handleUpdateCertificateToSheets(){
   if(btn)btn.disabled=true; if(lbl)lbl.textContent='Updating…';
 
   const cleanItems=certState.items.filter(i=>(i.desc||'').trim()).map(item=>({
-    desc:item.desc||'', qty:parseFloat(item.qty)||0, unit:item.unit||'Nos', remarks:item.remarks||''
+    desc:item.desc||'', qty:parseFloat(item.qty)||0, unit:item.unit||'Nos'
   }));
 
   const payload={
@@ -5456,7 +5443,6 @@ async function handleUpdateCertificateToSheets(){
     refNo:document.getElementById('cert-ref-no').value.trim()||'',
     site:document.getElementById('cert-site').value.trim()||'',
     itemsJson:JSON.stringify(cleanItems),
-    remarks:document.getElementById('cert-remarks').value.trim()||'',
     recipientName:certState.recipient.name,
     recipientAddress:certState.recipient.address||'',
     recipientPhone:certState.recipient.phone||'',
@@ -5506,7 +5492,7 @@ async function editCertificate(certNo){
       certNo:c['Cert No']||'', certType:c['Cert Type']||'Refilling',
       issueDate:toDateInputValue(c['Issue Date']),
       validUntil:c['Valid Until']?toDateInputValue(c['Valid Until']):'',
-      refNo:c['Ref No']||'', site:c['Site']||'', remarks:c['Remarks']||'',
+      refNo:c['Ref No']||'', site:c['Site']||'',
       recipient:{
         name:c['Recipient Name']||'', address:c['Recipient Address']||'',
         phone:c['Recipient Phone']||'', email:c['Recipient Email']||'', gstin:c['Recipient GSTIN']||''
@@ -5527,7 +5513,6 @@ async function editCertificate(certNo){
     document.getElementById('cert-recipient-phone').value=certState.recipient.phone;
     document.getElementById('cert-recipient-email').value=certState.recipient.email;
     document.getElementById('cert-recipient-gstin').value=certState.recipient.gstin;
-    document.getElementById('cert-remarks').value=certState.remarks;
     document.getElementById('cert-recipient-dropdown').style.display='none';
     document.getElementById('cert-no-status').textContent='';
     document.getElementById('cert-items').innerHTML='';
@@ -5535,14 +5520,13 @@ async function editCertificate(certNo){
     (items.length?items:[{}]).forEach(it=>{
       addCertItem();
       const last=certState.items[certState.items.length-1];
-      last.desc=it.desc||''; last.qty=parseFloat(it.qty)||1; last.unit=it.unit||'Nos'; last.remarks=it.remarks||'';
+      last.desc=it.desc||''; last.qty=parseFloat(it.qty)||1; last.unit=it.unit||'Nos';
       const row=document.getElementById('cti-'+last.id);
       if(row){
         const cells=row.querySelectorAll('input,select');
         if(cells[0])cells[0].value=last.desc;
         if(cells[1])cells[1].value=last.qty;
         if(cells[2])cells[2].value=last.unit;
-        if(cells[3])cells[3].value=last.remarks;
       }
     });
 
@@ -5617,7 +5601,6 @@ function handlePrintCertificate(){
     refNo:document.getElementById('cert-ref-no').value.trim(),
     site:document.getElementById('cert-site').value.trim(),
     items:certState.items.filter(i=>(i.desc||'').trim()),
-    remarks:document.getElementById('cert-remarks').value.trim(),
     recipientName:certState.recipient.name,
     recipientAddress:certState.recipient.address,
     recipientPhone:certState.recipient.phone,
@@ -5635,7 +5618,6 @@ function handlePreviewCertificate(){
     refNo:document.getElementById('cert-ref-no').value.trim(),
     site:document.getElementById('cert-site').value.trim(),
     items:certState.items.filter(i=>(i.desc||'').trim()),
-    remarks:document.getElementById('cert-remarks').value.trim(),
     recipientName:certState.recipient.name||'-',
     recipientAddress:certState.recipient.address,
     recipientPhone:certState.recipient.phone,
@@ -5659,7 +5641,7 @@ async function reprintCertificate(certNo){
       certNo:c['Cert No'],certType:c['Cert Type']||'',
       issueDate:c['Issue Date'],validUntil:c['Valid Until']||'',
       refNo:c['Ref No']||'',site:c['Site']||'',
-      items:items,remarks:c['Remarks']||'',
+      items:items,
       recipientName:c['Recipient Name']||'',recipientAddress:c['Recipient Address']||'',
       recipientPhone:c['Recipient Phone']||'',recipientEmail:c['Recipient Email']||'',
       recipientGstin:c['Recipient GSTIN']||''
@@ -5700,7 +5682,6 @@ body{font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#000;background
 .cert-meta-item{text-align:center;}
 .cert-meta-label{color:#777;text-transform:uppercase;letter-spacing:0.4px;font-size:9px;}
 .cert-meta-value{font-weight:bold;color:#2A2660;margin-top:1mm;}
-.cert-remarks{font-size:9px;color:#555;margin-top:3mm;font-style:italic;border-top:1px dashed #ccc;padding-top:3mm;}
 .cert-footer{border-top:2px solid #2A2660;padding-top:5mm;margin-top:auto;display:flex;justify-content:space-between;align-items:flex-end;}
 .cert-sign{text-align:center;}
 .cert-sign-line{width:45mm;border-top:1px solid #000;margin:0 auto 1mm;}
@@ -5733,9 +5714,9 @@ body{font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#000;background
     </div>
 
     <table class="cert-items-table">
-      <thead><tr><th style="width:46%;">Description of Work / Item</th><th style="width:12%;">Qty</th><th style="width:12%;">Unit</th><th style="width:30%;">Remarks</th></tr></thead>
+      <thead><tr><th style="width:60%;">Description of Work / Item</th><th style="width:20%;">Qty</th><th style="width:20%;">Unit</th></tr></thead>
       <tbody>
-        ${(data.items&&data.items.length?data.items:[]).map(it=>`<tr><td>${(it.desc||'').replace(/\n/g,'<br/>')}</td><td style="text-align:center;">${it.qty||''}</td><td style="text-align:center;">${it.unit||''}</td><td>${(it.remarks||'').replace(/\n/g,'<br/>')}</td></tr>`).join('')||'<tr><td colspan="4" style="text-align:center;color:#999;">No items specified</td></tr>'}
+        ${(data.items&&data.items.length?data.items:[]).map(it=>`<tr><td>${(it.desc||'').replace(/\n/g,'<br/>')}</td><td style="text-align:center;">${it.qty||''}</td><td style="text-align:center;">${it.unit||''}</td></tr>`).join('')||'<tr><td colspan="3" style="text-align:center;color:#999;">No items specified</td></tr>'}
       </tbody>
     </table>
 
@@ -5746,7 +5727,6 @@ body{font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#000;background
       ${data.site?`<div class="cert-meta-item"><div class="cert-meta-label">Site / Location</div><div class="cert-meta-value">${data.site}</div></div>`:''}
     </div>
 
-    ${data.remarks?`<div class="cert-remarks"><strong>Remarks:</strong> ${data.remarks}</div>`:''}
   </div>
 
   <div class="cert-footer">
