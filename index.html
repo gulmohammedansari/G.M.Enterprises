@@ -5200,7 +5200,8 @@ let certState = {
   validUntil:'', refNo:'', site:'', remarks:'',
   recipient:{name:'',address:'',phone:'',email:'',gstin:''},
   items:[],
-  isSaved:false, buyerSearchTimeout:null
+  isSaved:false, buyerSearchTimeout:null,
+  editMode:false, originalCertNo:''
 };
 let liveCertificates=[];
 
@@ -5216,7 +5217,8 @@ function openNewCertificatePage(){
     validUntil:'', refNo:'', site:'', remarks:'',
     recipient:{name:'',address:'',phone:'',email:'',gstin:''},
     items:[],
-    isSaved:false, buyerSearchTimeout:null
+    isSaved:false, buyerSearchTimeout:null,
+    editMode:false, originalCertNo:''
   };
   const ss=document.getElementById('cert-save-status');if(ss){ss.textContent='● Unsaved';ss.style.color='var(--text3)';}
   const tl=document.getElementById('cert-page-title');if(tl)tl.textContent='New Certificate';
@@ -5376,6 +5378,7 @@ async function handleSaveCertBuyer(){
 
 // ── SAVE CERTIFICATE → GAS ────────────────────────────────────────────────────
 async function handleSaveCertificate(){
+  if(certState.editMode){ return handleUpdateCertificateToSheets(); }
   const certNo=document.getElementById('cert-no').value.trim();
   if(!certNo){showToast('Certificate No. is required.','error');return;}
   if(!certState.recipient.name.trim()){showToast('Recipient name is required.','error');return;}
@@ -5426,6 +5429,133 @@ async function handleSaveCertificate(){
   finally{if(btn)btn.disabled=false; if(lbl)lbl.textContent='Save Certificate';}
 }
 
+// ── UPDATE EXISTING CERTIFICATE (GAS) — overwrites the original Sheets row ───
+async function handleUpdateCertificateToSheets(){
+  const certNo=document.getElementById('cert-no').value.trim();
+  if(!certNo){showToast('Certificate No. is required.','error');return;}
+  if(!certState.recipient.name.trim()){showToast('Recipient name is required.','error');return;}
+  if(!certState.items.length||!certState.items.some(i=>(i.desc||'').trim())){showToast('Please add at least one item / scope of work.','error');return;}
+
+  const btn=document.getElementById('cert-save-btn');
+  const lbl=document.getElementById('cert-save-btn-label');
+  if(btn)btn.disabled=true; if(lbl)lbl.textContent='Updating…';
+
+  const cleanItems=certState.items.filter(i=>(i.desc||'').trim()).map(item=>({
+    desc:item.desc||'', qty:parseFloat(item.qty)||0, unit:item.unit||'Nos', remarks:item.remarks||''
+  }));
+
+  const payload={
+    action:'updateCertificate',
+    token:sessionStorage.getItem('gme_token')||'',
+    username:sessionStorage.getItem('gme_username')||'Unknown',
+    originalCertNo:certState.originalCertNo,
+    certNo,
+    certType:document.getElementById('cert-type').value,
+    issueDate:document.getElementById('cert-issue-date').value||'',
+    validUntil:document.getElementById('cert-valid-until').value||'',
+    refNo:document.getElementById('cert-ref-no').value.trim()||'',
+    site:document.getElementById('cert-site').value.trim()||'',
+    itemsJson:JSON.stringify(cleanItems),
+    remarks:document.getElementById('cert-remarks').value.trim()||'',
+    recipientName:certState.recipient.name,
+    recipientAddress:certState.recipient.address||'',
+    recipientPhone:certState.recipient.phone||'',
+    recipientEmail:certState.recipient.email||'',
+    recipientGstin:certState.recipient.gstin||''
+  };
+
+  try{
+    const res=await fetch(googleScriptUrl,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(payload)});
+    const result=await res.json();
+    if(result.sessionExpired){doLogout();return;}
+    if(result.success===false&&(result.message||'').toLowerCase().includes('duplicate')){
+      showToast(`Certificate "${certNo}" already exists.`,'error');
+    }else if((result.message||'').toLowerCase().includes('not found')||result.result==='notfound'){
+      showToast('Original certificate not found — it may have been deleted.','error');
+    }else if(result.success!==false){
+      certState.isSaved=true;
+      certState.originalCertNo=certNo;
+      const ss=document.getElementById('cert-save-status');
+      if(ss){ss.textContent='✓ Updated';ss.style.color='var(--success)';}
+      showToast('Certificate updated in Google Sheets.','success');
+    }else{
+      showToast('Error: '+(result.message||'Unknown response'),'error');
+    }
+  }catch(err){showToast('Database connection failed.','error');}
+  finally{if(btn)btn.disabled=false; if(lbl)lbl.textContent='Update Certificate';}
+}
+
+// ── EDIT CERTIFICATE — loads a saved certificate into the New Certificate page ─
+async function editCertificate(certNo){
+  showToast('Loading certificate for edit…');
+  const token=sessionStorage.getItem('gme_token')||'';
+  try{
+    const res=await fetch(`${googleScriptUrl}?action=getCertificates&token=${encodeURIComponent(token)}`);
+    const data=await res.json();
+    if(data.sessionExpired){doLogout();return;}
+    const c=(data.certificates||[]).find(x=>(x['Cert No']||'').toString().trim()===certNo.trim());
+    if(!c){showToast('Certificate not found.','error');return;}
+    let items=[];try{items=JSON.parse(c['Items (JSON)']||'[]');}catch(e){items=[];}
+
+    // Hide regular topbar and all other pages — same as openNewCertificatePage
+    document.getElementById('main-topbar').style.display='none';
+    ['inv-page-header','challan-page-header','quotation-page-header','creditnote-page-header'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+    document.querySelectorAll('[id^="page-"]').forEach(el=>el.classList.add('page-hidden'));
+
+    certState={
+      certNo:c['Cert No']||'', certType:c['Cert Type']||'Refilling',
+      issueDate:toDateInputValue(c['Issue Date']),
+      validUntil:c['Valid Until']?toDateInputValue(c['Valid Until']):'',
+      refNo:c['Ref No']||'', site:c['Site']||'', remarks:c['Remarks']||'',
+      recipient:{
+        name:c['Recipient Name']||'', address:c['Recipient Address']||'',
+        phone:c['Recipient Phone']||'', email:c['Recipient Email']||'', gstin:c['Recipient GSTIN']||''
+      },
+      items:[],
+      isSaved:true, buyerSearchTimeout:null,
+      editMode:true, originalCertNo:c['Cert No']||''
+    };
+
+    document.getElementById('cert-no').value=certState.certNo;
+    document.getElementById('cert-type').value=certState.certType;
+    document.getElementById('cert-issue-date').value=certState.issueDate;
+    document.getElementById('cert-valid-until').value=certState.validUntil;
+    document.getElementById('cert-ref-no').value=certState.refNo;
+    document.getElementById('cert-site').value=certState.site;
+    document.getElementById('cert-recipient-name').value=certState.recipient.name;
+    document.getElementById('cert-recipient-address').value=certState.recipient.address;
+    document.getElementById('cert-recipient-phone').value=certState.recipient.phone;
+    document.getElementById('cert-recipient-email').value=certState.recipient.email;
+    document.getElementById('cert-recipient-gstin').value=certState.recipient.gstin;
+    document.getElementById('cert-remarks').value=certState.remarks;
+    document.getElementById('cert-recipient-dropdown').style.display='none';
+    document.getElementById('cert-no-status').textContent='';
+    document.getElementById('cert-items').innerHTML='';
+
+    (items.length?items:[{}]).forEach(it=>{
+      addCertItem();
+      const last=certState.items[certState.items.length-1];
+      last.desc=it.desc||''; last.qty=parseFloat(it.qty)||1; last.unit=it.unit||'Nos'; last.remarks=it.remarks||'';
+      const row=document.getElementById('cti-'+last.id);
+      if(row){
+        const cells=row.querySelectorAll('input,select');
+        if(cells[0])cells[0].value=last.desc;
+        if(cells[1])cells[1].value=last.qty;
+        if(cells[2])cells[2].value=last.unit;
+        if(cells[3])cells[3].value=last.remarks;
+      }
+    });
+
+    const tl=document.getElementById('cert-page-title'); if(tl)tl.textContent='Edit Certificate — '+certState.certNo;
+    const lbl=document.getElementById('cert-save-btn-label'); if(lbl)lbl.textContent='Update Certificate';
+    const ss=document.getElementById('cert-save-status'); if(ss){ss.textContent='✎ Editing saved certificate';ss.style.color='var(--text3)';}
+
+    document.getElementById('certificate-page-header').style.display='flex';
+    document.getElementById('page-new-certificate').classList.remove('page-hidden');
+    showToast('Certificate loaded — make changes and click Update.','success');
+  }catch(e){showToast('Failed to load certificate for edit.','error');}
+}
+
 // ── LOAD & RENDER CERTIFICATES LIST ──────────────────────────────────────────
 async function loadAndRenderCertificates(){
   const token=sessionStorage.getItem('gme_token')||'';
@@ -5464,7 +5594,8 @@ function renderCertificatesTable(certs){
       <td class="hide-mobile">${c['Valid Until']?fmtDate(c['Valid Until']):'-'}</td>
       <td>${statusBadge}</td>
       <td style="white-space:nowrap;">
-        <button class="btn" style="padding:4px 10px;font-size:12px;" onclick="reprintCertificate('${no}')">Print</button>
+        <button class="btn" style="padding:4px 10px;font-size:12px;" onclick="editCertificate('${no}')">Edit</button>
+        <button class="btn" style="padding:4px 10px;font-size:12px;margin-left:4px;" onclick="reprintCertificate('${no}')">Print</button>
       </td>
     </tr>`;
   }).join('');
